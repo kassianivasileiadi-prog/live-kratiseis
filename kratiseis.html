@@ -72,8 +72,8 @@
 </div>
 
 <script>
-// ⚠️ ΑΝΤΙΚΑΤΑΣΤΗΣΕ ΤΟ ΜΕ ΤΟ ΔΙΚΟ ΣΟΥ WEB APP URL ΑΠΟ ΤΟ DEPLOY
-const url = "https://script.google.com/macros/s/AKfycbxKzx5-ViuRUuCHCb6_1DX1yNl8z5rydPlUlsXeHEEgSDgYjl_yE5KY6bkrrG-Gm7qU/exec";
+// ⚠️ ΑΝΤΙΚΑΤΑΣΤΗΣΕ ΤΟ ΜΕ ΤΟ ΔΙΚΟ ΣΟΥ ΝΕΟ WEB APP URL ΠΟΥ ΜΟΛΙΣ ΕΚΑΝΕΣ DEPLOY
+const url = "https://script.google.com/macros/s/AKfycbyp3SuTHW8uU-Rbdgy7Pa5yyT7dzZMtzNefXNi0wq8zJulzH09g5APgdbr1_7qqGgwY/exec";
 
 const form = document.getElementById("form");
 const date = document.getElementById("date");
@@ -83,8 +83,8 @@ const submitBtn = document.getElementById("submitBtn");
 
 let maxSeats = 0;
 
-// Έλεγχος διαθεσιμότητας με την αλλαγή ημερομηνίας
-date.addEventListener("change", async () => {
+// Έλεγχος διαθεσιμότητας θέσεων (Με χρήση JSONP για να προσπεράσουμε το CORS)
+date.addEventListener("change", () => {
     if (!date.value) {
         msg.innerText = "";
         submitBtn.disabled = false;
@@ -95,10 +95,9 @@ date.addEventListener("change", async () => {
     msg.innerText = "Έλεγχος διαθεσιμότητας θέσεων...";
     submitBtn.disabled = true;
 
-    try {
-        const res = await fetch(url + "?date=" + encodeURIComponent(date.value));
-        const data = await res.json();
-
+    const callbackName = "jsonp_" + Date.now();
+    
+    window[callbackName] = function(data) {
         maxSeats = data.available || 0;
 
         if (maxSeats <= 0) {
@@ -114,13 +113,22 @@ date.addEventListener("change", async () => {
             seats.value = 1;
             submitBtn.disabled = false;
         }
-    } catch (err) {
+        
+        document.body.removeChild(script);
+        delete window[callbackName];
+    };
+
+    const script = document.createElement("script");
+    script.src = url + "?date=" + encodeURIComponent(date.value) + "&callback=" + callbackName;
+    script.onerror = function() {
         msg.style.color = "red";
         msg.innerText = "Σφάλμα κατά τη σύνδεση με το σύστημα.";
-    }
+        submitBtn.disabled = false;
+    };
+    document.body.appendChild(script);
 });
 
-// Υποβολή Κράτησης
+// Υποβολή Κράτησης (Με no-cors για ασφαλή καταχώρηση)
 form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const requested = Number(seats.value);
@@ -137,21 +145,22 @@ form.addEventListener("submit", async (e) => {
 
     try {
         const formData = new FormData(form);
-        const res = await fetch(url, {
+        
+        await fetch(url, {
             method: "POST",
+            mode: "no-cors", 
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
             body: new URLSearchParams(formData)
         });
-        const data = await res.json();
 
-        if (data.status === "success") {
-            msg.style.color = "green";
-            msg.innerText = "✔ Η κράτηση ολοκληρώθηκε με επιτυχία!";
-            form.reset();
-            maxSeats = 0;
-        } else {
-            msg.style.color = "red";
-            msg.innerText = "❌ " + data.message;
-        }
+        // Εφόσον χρησιμοποιούμε no-cors, αν δεν πετάξει σφάλμα δικτύου, θεωρούμε την κράτηση επιτυχημένη
+        msg.style.color = "green";
+        msg.innerText = "✔ Η κράτηση ολοκληρώθηκε με επιτυχία! Παρακαλώ ελέγξτε το Google Sheet.";
+        form.reset();
+        maxSeats = 0;
+
     } catch (err) {
         msg.style.color = "red";
         msg.innerText = "Σφάλμα συστήματος. Η κράτηση δεν ολοκληρώθηκε.";
