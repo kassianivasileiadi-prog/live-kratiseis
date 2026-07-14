@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Σύστημα Κρατήσεων Παραστάσεων</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px;
+            display: flex;
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh;
+            background-color: #f0f2f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 380px;
+        }
+
+        h2 { text-align: center; margin-top: 0; color: #1a1a1a; }
+        form { display: flex; flex-direction: column; gap: 15px; }
+        label { font-weight: 600; color: #444; font-size: 14px; }
+        input, select, button { padding: 12px; font-size: 16px; border-radius: 6px; border: 1px solid #ccc; outline: none; }
+        input:focus, select:focus { border-color: #007bff; }
+        button { background-color: #007bff; color: white; border: none; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        
+        #msg { 
+            font-weight: bold; 
+            margin-top: 15px; 
+            text-align: center; 
+            font-size: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Κράτηση Θέσεων</h2>
+
+    <form id="form">
+        <label for="fullname">Ονοματεπώνυμο:</label>
+        <input id="fullname" name="fullname" type="text" required placeholder="π.χ. Ιωάννης Παπαδόπουλος">
+
+        <label for="email">Email:</label>
+        <input id="email" name="email" type="email" required placeholder="π.χ. info@example.com">
+
+        <label for="date">Ημερομηνία Παράστασης:</label>
+        <select id="date" name="date" required>
+            <option value="">-- Επιλέξτε ημερομηνία --</option>
+            <option value="20/09/2026">20/09/2026</option>
+            <option value="21/09/2026">21/09/2026</option>
+            <option value="22/09/2026">22/09/2026</option>
+        </select>
+
+        <label for="seats">Αριθμός Θέσεων:</label>
+        <input id="seats" name="seats" type="number" min="1" value="1" required>
+
+        <button type="submit" id="submitBtn">Επιβεβαίωση Κράτησης</button>
+    </form>
+
+    <p id="msg"></p>
+</div>
+
+<script>
+// ⚠️ ΑΝΤΙΚΑΤΑΣΤΗΣΕ ΤΟ ΜΕ ΤΟ ΔΙΚΟ ΣΟΥ WEB APP URL ΑΠΟ ΤΟ DEPLOY
+const url = "https://script.google.com/macros/s/AKfycby0CrluGI8eb90AT03k0uWTm4eh7eBO2sPVrBvpVXMN6f1NWb9-X7NMAV7gQyhZMDO_/exec";
+
+const form = document.getElementById("form");
+const date = document.getElementById("date");
+const seats = document.getElementById("seats");
+const msg = document.getElementById("msg");
+const submitBtn = document.getElementById("submitBtn");
+
+let maxSeats = 0;
+
+// Έλεγχος διαθεσιμότητας με την αλλαγή ημερομηνίας
+date.addEventListener("change", async () => {
+    if (!date.value) {
+        msg.innerText = "";
+        submitBtn.disabled = false;
+        return;
+    }
+
+    msg.style.color = "#333";
+    msg.innerText = "Έλεγχος διαθεσιμότητας θέσεων...";
+    submitBtn.disabled = true;
+
+    try {
+        const res = await fetch(url + "?date=" + encodeURIComponent(date.value));
+        const data = await res.json();
+
+        maxSeats = data.available || 0;
+
+        if (maxSeats <= 0) {
+            msg.style.color = "red";
+            msg.innerText = "❌ Η παράσταση για αυτή την ημερομηνία είναι πλήρης!";
+            seats.max = 0;
+            seats.value = 0;
+            submitBtn.disabled = true;
+        } else {
+            msg.style.color = "green";
+            msg.innerText = "Διαθέσιμες θέσεις: " + maxSeats;
+            seats.max = maxSeats;
+            seats.value = 1;
+            submitBtn.disabled = false;
+        }
+    } catch (err) {
+        msg.style.color = "red";
+        msg.innerText = "Σφάλμα κατά τη σύνδεση με το σύστημα.";
+    }
+});
+
+// Υποβολή Κράτησης
+form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const requested = Number(seats.value);
+
+    if (requested > maxSeats || maxSeats <= 0) {
+        msg.style.color = "red";
+        msg.innerText = "Δεν υπάρχουν αρκετές διαθέσιμες θέσεις.";
+        return;
+    }
+
+    msg.style.color = "#333";
+    msg.innerText = "Παρακαλώ περιμένετε, η κράτηση επεξεργάζεται...";
+    submitBtn.disabled = true;
+
+    try {
+        const formData = new FormData(form);
+        const res = await fetch(url, {
+            method: "POST",
+            body: new URLSearchParams(formData)
+        });
+        const data = await res.json();
+
+        if (data.status === "success") {
+            msg.style.color = "green";
+            msg.innerText = "✔ Η κράτηση ολοκληρώθηκε με επιτυχία!";
+            form.reset();
+            maxSeats = 0;
+        } else {
+            msg.style.color = "red";
+            msg.innerText = "❌ " + data.message;
+        }
+    } catch (err) {
+        msg.style.color = "red";
+        msg.innerText = "Σφάλμα συστήματος. Η κράτηση δεν ολοκληρώθηκε.";
+    } finally {
+        submitBtn.disabled = false;
+    }
+});
+</script>
+
+</body>
+</html>
