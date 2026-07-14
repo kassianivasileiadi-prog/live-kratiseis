@@ -73,7 +73,7 @@
 
 <script>
 // ⚠️ ΑΝΤΙΚΑΤΑΣΤΗΣΕ ΤΟ ΜΕ ΤΟ ΔΙΚΟ ΣΟΥ ΝΕΟ WEB APP URL ΠΟΥ ΜΟΛΙΣ ΕΚΑΝΕΣ DEPLOY
-const url = "https://script.google.com/macros/s/AKfycbyp3SuTHW8uU-Rbdgy7Pa5yyT7dzZMtzNefXNi0wq8zJulzH09g5APgdbr1_7qqGgwY/exec";
+const url = "https://script.google.com/macros/s/AKfycbymyWHPRNnjjdGrqn9s6BFPvZLlyJPvFGEtU7ft_8ZgPRv3cP6Aeq5g_qXAsWPzKw4-/exec";
 
 const form = document.getElementById("form");
 const date = document.getElementById("date");
@@ -128,7 +128,7 @@ date.addEventListener("change", () => {
     document.body.appendChild(script);
 });
 
-// Υποβολή Κράτησης (Με no-cors για ασφαλή καταχώρηση)
+// Υποβολή Κράτησης (Με ασφαλή αποστολή δεδομένων μέσω URL)
 form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const requested = Number(seats.value);
@@ -144,18 +144,38 @@ form.addEventListener("submit", async (e) => {
     submitBtn.disabled = true;
 
     try {
-        const formData = new FormData(form);
-        
-        await fetch(url, {
+        // Παίρνουμε τις τιμές από τη φόρμα
+        const fullnameVal = document.getElementById("fullname").value;
+        const emailVal = document.getElementById("email").value;
+        const dateVal = date.value;
+
+        // Χτίζουμε το URL στέλνοντας τα δεδομένα απευθείας εκεί (έτσι η Google τα διαβάζει πάντα!)
+        const postUrl = url + 
+            "?action=book" +
+            "&fullname=" + encodeURIComponent(fullnameVal) + 
+            "&email=" + encodeURIComponent(emailVal) + 
+            "&date=" + encodeURIComponent(dateVal) + 
+            "&seats=" + encodeURIComponent(requested);
+
+        // Στέλνουμε το αίτημα
+        await fetch(postUrl, {
             method: "POST",
-            mode: "no-cors", 
-            headers: {
-                "Content-Type": "application/x-www-form-urlencoded"
-            },
-            body: new URLSearchParams(formData)
+            mode: "no-cors"
         });
 
-        // Εφόσον χρησιμοποιούμε no-cors, αν δεν πετάξει σφάλμα δικτύου, θεωρούμε την κράτηση επιτυχημένη
+        // Επιτυχία!
+        msg.style.color = "green";
+        msg.innerText = "✔ Η κράτηση ολοκληρώθηκε με επιτυχία! Παρακαλώ ελέγξτε το Google Sheet.";
+        form.reset();
+        maxSeats = 0;
+
+    } catch (err) {
+        msg.style.color = "red";
+        msg.innerText = "Σφάλμα συστήματος. Η κράτηση δεν ολοκληρώθηκε.";
+    } finally {
+        submitBtn.disabled = false;
+    }
+});        // Εφόσον χρησιμοποιούμε no-cors, αν δεν πετάξει σφάλμα δικτύου, θεωρούμε την κράτηση επιτυχημένη
         msg.style.color = "green";
         msg.innerText = "✔ Η κράτηση ολοκληρώθηκε με επιτυχία! Παρακαλώ ελέγξτε το Google Sheet.";
         form.reset();
